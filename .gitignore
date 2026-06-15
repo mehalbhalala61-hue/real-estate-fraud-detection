@@ -7,3 +7,6 @@ conda
 git 
 .ipynb_checkpoints/ 
 .pytest_cache/ 
+Dockerfile 
+Dockerfile.streaml 
+docker-compose.yml 
