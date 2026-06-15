@@ -1,0 +1,109 @@
+# =============================================================================
+# Modality Strategy — Real Estate Fraud Detection
+# Drives which data modalities are active and how they are combined.
+# Change ONLY this file to switch strategies — never hardcode in src/*.py
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Active modalities
+# -----------------------------------------------------------------------------
+modalities:
+  tabular:
+    enabled: true
+    description: "Price, area, bed/bath, city/state — primary signal"
+
+  text:
+    # USA Real Estate Dataset has no description column → keep false
+    # Set true only if you add a listing description column
+    enabled: false
+    description: "Listing description text — TF-IDF + TruncatedSVD"
+    column: description
+    fallback_on_missing: true   # If column missing at inference → zero-fill SVD features
+
+  image:
+    enabled: false
+    description: "Property photo analysis — out of scope v1.0"
+
+# -----------------------------------------------------------------------------
+# Tabular strategy
+# -----------------------------------------------------------------------------
+tabular_strategy:
+  numerical_imputation: median          # SimpleImputer strategy
+  categorical_imputation: most_frequent
+  scaling: standard                     # StandardScaler — z-score
+  high_cardinality_encoding:
+    city: target_encoding               # OOF target encoding inside CV loop
+    zip_code: frequency                 # Count encoding — no leakage risk
+  low_cardinality_encoding:
+    status: ordinal                     # OrdinalEncoder — 2-3 values only
+    state: ordinal                      # 50 values — ordinal fine
+
+  # Outlier strategy — clip or keep?
+  # 'keep' → LightGBM handles outliers natively via tree splits
+  # 'clip' → only if Logistic Regression baseline needs it
+  outlier_strategy: keep
+
+# -----------------------------------------------------------------------------
+# Text strategy (only used if text.enabled = true)
+# -----------------------------------------------------------------------------
+text_strategy:
+  vectorizer: tfidf
+  tfidf_max_features: 5000
+  tfidf_ngram_range: [1, 2]             # unigrams + bigrams
+  tfidf_sublinear_tf: true              # log(1+tf) — standard for fraud
+  dimensionality_reduction: truncated_svd
+  svd_components: 50
+  svd_random_state: 42
+  # Text features added AFTER tabular features — horizontal concat
+  concat_axis: 1
+
+# -----------------------------------------------------------------------------
+# Fusion strategy (how modalities combine before meta-model)
+# -----------------------------------------------------------------------------
+fusion:
+  method: stacking                      # OOF stacking — see models.py
+  # stacking: train meta-model on OOF predictions of each modality model
+  # early_fusion: concat features before training single model
+  # late_fusion: average probabilities — simpler but less powerful
+
+  # Which models feed the stacking meta-model?
+  stacking_inputs:
+    - name: lr_tabular
+      modality: tabular
+      model: logistic_regression
+      always_include: true
+
+    - name: lgbm_tabular
+      modality: tabular
+      model: lightgbm
+      always_include: true
+
+    - name: lgbm_text
+      modality: text
+      model: lightgbm
+      # Automatically excluded if text.enabled = false
+      condition: "text.enabled == true"
+
+# -----------------------------------------------------------------------------
+# Decision rationale (for interviews / documentation)
+# -----------------------------------------------------------------------------
+rationale:
+  why_tabular_primary: >
+    Price, area, and location features carry the strongest fraud signal.
+    Rule-based fraud labeling was designed around tabular anomalies.
+    Text features are supplementary when available.
+
+  why_no_text_v1: >
+    USA Real Estate Dataset (Kaggle) does not include listing description text.
+    Adding text modality would require scraping or a different dataset.
+    Architecture is ready — flip text.enabled to true when data is available.
+
+  why_stacking_over_averaging: >
+    Stacking learns optimal weights between models via meta-model.
+    Simple averaging assumes equal contribution — incorrect when one modality
+    carries significantly more signal (tabular >> text in this domain).
+
+  why_tfidf_not_embeddings: >
+    BERT/sentence-transformers would require GPU and increase latency.
+    TF-IDF + SVD(50) keeps inference < 500ms on CPU.
+    Text is supplementary here — heavyweight embeddings not justified.

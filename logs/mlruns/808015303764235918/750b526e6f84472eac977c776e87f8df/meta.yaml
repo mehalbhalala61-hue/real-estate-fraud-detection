@@ -1,0 +1,14 @@
+artifact_uri: file:C:/Users/mehal/Downloads/machinelearning/real_estate_fraud_detection/logs/mlruns/808015303764235918/750b526e6f84472eac977c776e87f8df/artifacts
+end_time: 1779013159431
+entry_point_name: ''
+experiment_id: '808015303764235918'
+lifecycle_stage: active
+run_id: 750b526e6f84472eac977c776e87f8df
+run_name: stacking_meta
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1779013133003
+status: 3
+tags: []
+user_id: mehal

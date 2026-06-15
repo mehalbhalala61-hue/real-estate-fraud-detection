@@ -1,0 +1,45 @@
+# Secrets
+.env
+*.env
+
+# Data — large files
+data/raw/
+data/splits/
+data/processed/*.parquet
+data/processed/oof_predictions.parquet
+data/processed/chromadb/
+
+# Keep these for deployment ↓
+# models/*.pkl      ← REMOVE THIS LINE
+# data/processed/   ← REMOVE THIS LINE
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MLflow
+logs/mlruns/
+mlartifacts/
+
+# Logs
+logs/*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

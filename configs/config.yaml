@@ -1,0 +1,278 @@
+# =============================================================================
+# Real Estate Fraud Detection — Master Configuration v1.1
+# =============================================================================
+
+project:
+  name: real_estate_fraud_detection
+  version: "1.1.0"
+  description: "ML system to detect fraudulent real estate listings"
+
+# -----------------------------------------------------------------------------
+# Data paths
+# -----------------------------------------------------------------------------
+data:
+  raw_path: data/raw/realtor-data.csv
+  processed_path: data/processed/
+  splits_path: data/splits/
+  fraud_labeler_stats_path: data/processed/fraud_labeler_stats.json
+
+# -----------------------------------------------------------------------------
+# Column configuration
+# -----------------------------------------------------------------------------
+columns:
+  all:
+    - brokered_by
+    - status
+    - price
+    - bed
+    - bath
+    - acre_lot
+    - street
+    - city
+    - state
+    - zip_code
+    - house_size
+    - prev_sold_date
+
+  drop:
+    - street
+    - brokered_by
+
+  target: is_fraud
+
+  numerical:
+    - price
+    - bed
+    - bath
+    - acre_lot
+    - house_size
+
+  categorical:
+    - status
+    - state
+
+  high_cardinality:
+    - city
+    - zip_code
+
+  temporal:
+    - prev_sold_date
+
+  engineered:
+      stateless:
+        - price_per_sqft
+        - bath_per_bed
+        - price_log
+        - house_size_log
+        - acre_lot_log
+        - is_large_property
+        - days_since_last_sale
+        - sold_year
+        - sold_month
+      fold_dependent:
+        - price_vs_city_median
+        - zip_listing_count
+        - city_median_price
+        - state_median_price
+        - city_fraud_rate     
+
+  group_col: city
+
+# -----------------------------------------------------------------------------
+# Feature engineering defaults
+# -----------------------------------------------------------------------------
+feature_defaults:
+  bath_per_bed_zero_bed_fill: 0.0
+
+# -----------------------------------------------------------------------------
+# Encoding strategy
+# -----------------------------------------------------------------------------
+encoding:
+  high_cardinality:
+    city: target_encoding
+    zip_code: frequency
+
+# -----------------------------------------------------------------------------
+# Temporal feature extraction
+# -----------------------------------------------------------------------------
+temporal_features:
+  prev_sold_date:
+    extract:
+      - days_since_last_sale
+      - sold_year
+      - sold_month
+    fill_missing_days: 9999
+
+# -----------------------------------------------------------------------------
+# Text features
+# -----------------------------------------------------------------------------
+text_features:
+  enabled: false
+  column: description
+  max_features: 5000
+  n_svd_components: 50
+
+# -----------------------------------------------------------------------------
+# Raw dtype enforcement
+# -----------------------------------------------------------------------------
+dtypes:
+  brokered_by: float64
+  status: object
+  price: float64
+  bed: float64
+  bath: float64
+  acre_lot: float64
+  street: float64
+  city: object
+  state: object
+  zip_code: object
+  house_size: float64
+  prev_sold_date: object
+
+# -----------------------------------------------------------------------------
+# Metrics
+# -----------------------------------------------------------------------------
+metrics:
+  primary: pr_auc
+  secondary: recall_at_95_precision
+  latency_p95_ms: 500
+  min_cv_folds: 5
+
+# -----------------------------------------------------------------------------
+# Fraud rules — calibrated for USA Real Estate Dataset (2M rows)
+#
+# Root cause analysis of 20% fraud rate:
+#   rule_duplicate   23.4% → zip_code is often null/generic → many false matches
+#   rule_state_anomaly 20% → US has huge intra-state price variance (CA: $200k–$5M)
+#   rule_price_low   17.8% → price_low_multiplier too aggressive on diverse cities
+#
+# Fixes applied:
+#   1. Clip price/house_size at p99 before stats (removes int32 overflow corruption)
+#   2. Raise min_fraud_score_threshold to 3 (need 3+ rules to be fraud)
+#   3. Tighten state_anomaly multipliers (0.20x / 6.0x — only extreme outliers)
+#   4. Duplicate rule: require min_zip_listings > 5 to avoid null/sparse zips
+#   5. price_per_sqft_percentile: 5 (was 10 — less aggressive)
+# -----------------------------------------------------------------------------
+fraud_rules:
+  # City median comparison
+  price_low_multiplier: 0.30        # was 0.50 — stricter (40% below city median)
+  price_high_multiplier: 4.00       # was 3.00 — looser (400% above city median)
+  price_per_sqft_percentile: 3      # was 10 — less aggressive
+
+  # Impossible values (data entry errors / corruption)
+  impossible_bed_threshold: 20
+  impossible_bath_threshold: 15
+  impossible_acre_threshold: 1000
+
+  # Size-price disconnect
+  price_size_disconnect_sqft: 5000
+  price_size_disconnect_price: 50000
+
+  # State anomaly — tightened significantly (US has massive intra-state variance)
+  state_low_multiplier: 0.15        # was 0.40 — only extreme outliers
+  state_high_multiplier: 8.00       # was 4.00 — only extreme outliers
+
+  # Duplicate rule — min zip listings to avoid null/sparse zip false matches
+  duplicate_min_zip_listings: 5     # NEW: skip duplicate check if zip has <5 listings
+
+  # Outlier clip thresholds (for stat computation only, not raw rule application)
+  price_clip_percentile: 99
+  house_size_clip_percentile: 99
+
+  # Threshold: listing must fire 2+ rules to be labeled fraud
+  # (3+ bahut strict tha — fraud rate 1% se neeche chali jaati thi)
+  min_fraud_score_threshold: 2      # 2+ rules = fraud label — 3-8% target fraud rate maintain karta hai
+
+  target_fraud_rate_min: 0.03
+  target_fraud_rate_max: 0.08
+
+  min_city_listings_for_stats: 30
+  min_state_listings_for_stats: 10
+
+# -----------------------------------------------------------------------------
+# Data quality checks
+# -----------------------------------------------------------------------------
+data_quality:
+  max_null_pct_warn: 30.0
+  max_null_pct_critical: 80.0
+  min_rows_required: 1000
+  skewness_log_transform_threshold: 1.0
+
+# -----------------------------------------------------------------------------
+# Model config
+# -----------------------------------------------------------------------------
+model:
+  cv_folds: 5
+  test_size: 0.20
+  random_state: 42
+
+  lgbm_defaults:
+    n_estimators: 500
+    learning_rate: 0.05
+    max_depth: 6
+    num_leaves: 63
+    min_child_samples: 30
+    subsample: 0.8
+    colsample_bytree: 0.8
+    scale_pos_weight: auto
+    random_state: 42
+    n_jobs: -1
+    verbose: -1
+
+# -----------------------------------------------------------------------------
+# Stacking
+# -----------------------------------------------------------------------------
+stacking:
+  base_models:
+    - logistic_regression
+    - lgbm_tabular
+    - lgbm_text
+  meta_model: logistic_regression
+  meta_model_C: 0.1
+
+# -----------------------------------------------------------------------------
+# MLflow
+# -----------------------------------------------------------------------------
+mlflow:
+  experiment_name: real-estate-fraud-v1
+  tracking_uri: logs/mlruns     # logs/ folder already exists — project root saaf rehga
+  registered_model_name: fraud_detector
+
+# -----------------------------------------------------------------------------
+# Paths
+# -----------------------------------------------------------------------------
+paths:
+  models: models/
+  preprocessing_pipeline: models/preprocessing_pipeline.pkl
+  text_pipeline: models/text_pipeline.pkl
+  lgbm_model: models/lgbm_model.pkl
+  stacked_model: models/stacked_model.pkl
+  calibrated_model: models/calibrated_model.pkl
+  reports: reports/
+  plots: reports/plots/
+  notebooks: notebooks/
+  tests: tests/                                      # folder structure mein missing — manually banana hai
+  docs: docs/                                        # folder exists — future documentation ke liye
+  eda_findings: reports/eda_findings.md
+  business_insights: reports/business_insights.md
+  evaluation_report: reports/evaluation_report.md
+  threshold_decisions: reports/threshold_decisions.md
+  drift_report: reports/drift_report.json
+
+# -----------------------------------------------------------------------------
+# API config
+# -----------------------------------------------------------------------------
+api:
+  host: "0.0.0.0"
+  port: 8000
+  fraud_threshold_suspicious: 0.70
+  fraud_threshold_review: 0.40
+  model_version: "1.1.0"
+
+# -----------------------------------------------------------------------------
+# Logging
+# -----------------------------------------------------------------------------
+logging:
+  level: INFO
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  log_file: logs/pipeline.log

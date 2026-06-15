@@ -1,0 +1,14 @@
+artifact_uri: file:C:/Users/mehal/Downloads/machinelearning/real_estate_fraud_detection/logs/mlruns/808015303764235918/aa44211b5a1e488da5187687241705e6/artifacts
+end_time: null
+entry_point_name: ''
+experiment_id: '808015303764235918'
+lifecycle_stage: active
+run_id: aa44211b5a1e488da5187687241705e6
+run_name: optuna_tuning
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1778644221488
+status: 1
+tags: []
+user_id: mehal

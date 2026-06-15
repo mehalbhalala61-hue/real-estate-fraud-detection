@@ -1,0 +1,66 @@
+# =============================================================================
+# Real Estate Fraud Detection — Python Dependencies
+# Python 3.11 required
+# =============================================================================
+
+# Core data science
+numpy==1.26.4
+pandas==2.2.2
+scipy==1.13.0
+scikit-learn==1.5.0
+
+# Gradient boosting
+lightgbm==4.3.0
+
+# Hyperparameter tuning
+optuna==3.6.1
+
+# Experiment tracking
+mlflow==2.13.0
+
+# Explainability
+shap==0.45.1
+
+# Database
+sqlalchemy==2.0.30
+psycopg2-binary==2.9.9
+alembic==1.13.1
+
+# API
+fastapi==0.111.0
+uvicorn[standard]==0.29.0
+pydantic==2.7.1
+python-multipart==0.0.9
+httpx==0.27.0
+
+# Streamlit dashboard
+streamlit==1.35.0
+plotly==5.22.0
+
+# Config & utils
+pyyaml==6.0.1
+python-dotenv==1.0.1
+joblib==1.4.2
+
+# Visualization (notebooks)
+matplotlib==3.9.0
+seaborn==0.13.2
+
+# Notebook
+jupyter==1.0.0
+ipykernel==6.29.4
+ipywidgets==8.1.3
+
+# Testing
+pytest==8.2.0
+pytest-asyncio==0.23.7
+requests==2.32.2
+
+# Code quality (optional but recommended)
+black==24.4.2
+isort==5.13.2
+
+# ── RAG / AI ──────────────────────────────────────────────────────────────────
+google-generativeai==0.5.4
+chromadb==0.5.0
+sentence-transformers==3.0.1

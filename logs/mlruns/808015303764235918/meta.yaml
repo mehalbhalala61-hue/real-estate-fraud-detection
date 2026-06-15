@@ -1,0 +1,8 @@
+artifact_location: file:C:/Users/mehal/Downloads/machinelearning/real_estate_fraud_detection/logs/mlruns/808015303764235918
+creation_time: 1778557390427
+experiment_id: '808015303764235918'
+last_update_time: 1778557390427
+lifecycle_stage: active
+name: real-estate-fraud-v1
+trace_location: null
+workspace: default

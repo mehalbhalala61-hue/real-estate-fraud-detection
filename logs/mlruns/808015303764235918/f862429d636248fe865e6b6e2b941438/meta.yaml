@@ -1,0 +1,14 @@
+artifact_uri: file:C:/Users/mehal/Downloads/machinelearning/real_estate_fraud_detection/logs/mlruns/808015303764235918/f862429d636248fe865e6b6e2b941438/artifacts
+end_time: 1778557732402
+entry_point_name: ''
+experiment_id: '808015303764235918'
+lifecycle_stage: active
+run_id: f862429d636248fe865e6b6e2b941438
+run_name: baseline_lr
+source_name: ''
+source_type: 4
+source_version: ''
+start_time: 1778557529297
+status: 3
+tags: []
+user_id: mehal

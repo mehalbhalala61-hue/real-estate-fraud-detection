@@ -1,0 +1,6 @@
+Model,PR-AUC,Recall@95P,Stage
+LR Baseline,0.5952,0.0,Day 5
+LGBM Baseline,0.7701,0.068,Day 5
+LGBM Tuned,0.7779,0.0744,Day 7
+Stacked,0.768,0.0234,Day 8
+★ Stacked+Calibrated,0.768,0.0234,Day 8 ← FINAL

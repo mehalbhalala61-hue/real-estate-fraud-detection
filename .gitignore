@@ -1,0 +1,9 @@
+data/ 
+models/ 
+.env 
+archive/ 
+archive.zip 
+conda 
+git 
+.ipynb_checkpoints/ 
+.pytest_cache/ 
