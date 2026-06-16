@@ -1,0 +1,13 @@
+column,dtype,nunique,null_pct,leakage_risk,action
+status,object,3,0.0,LOW,Ordinal or OHE encoding
+price,float64,102137,0.07,LOW,Keep — standard scaling
+bed,float64,99,19.91,LOW,Keep — standard scaling
+bath,float64,86,21.3,LOW,Keep — standard scaling
+acre_lot,float64,16057,14.44,LOW,Keep — standard scaling
+city,object,20098,0.06,MEDIUM,Frequency or target encoding (OOF-safe)
+state,object,55,0.0,LOW,Ordinal or OHE encoding
+zip_code,object,30334,0.01,MEDIUM,Frequency or target encoding (OOF-safe)
+house_size,float64,12061,23.82,LOW,Keep — standard scaling
+prev_sold_date,object,14916,31.71,MEDIUM,Extract year/month features only
+brokered_by,N/A — dropped,N/A,N/A,HIGH — DROPPED,Already dropped
+street,N/A — dropped,N/A,N/A,HIGH — DROPPED,Already dropped
