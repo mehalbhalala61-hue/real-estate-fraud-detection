@@ -33,7 +33,7 @@ st.set_page_config(
 
 # ── Shared config (accessible from all pages via session_state) ──────────────
 if "api_base_url" not in st.session_state:
-    st.session_state.api_base_url = os.getenv("API_BASE_URL", "http://localhost:8000")
+    st.session_state.api_base_url = os.getenv("API_BASE_URL", "https://real-estate-fraud-detection.onrender.com")
 if "api_key" not in st.session_state:
     st.session_state.api_key = os.getenv("API_KEY", "dev-secret-key")
 
