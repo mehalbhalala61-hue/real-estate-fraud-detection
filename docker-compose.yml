@@ -1,0 +1,79 @@
+version: "3.9"
+
+# Real Estate Fraud Detection — docker-compose
+# Start all 3 services: docker-compose up --build
+#
+# FastAPI  : http://localhost:8000/docs
+# Streamlit: http://localhost:8501
+# PostgreSQL: localhost:5432
+
+services:
+
+  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: fraud_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fraud_user
+      POSTGRES_PASSWORD: fraud_pass
+      POSTGRES_DB: fraud_db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fraud_user -d fraud_db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ── FastAPI ─────────────────────────────────────────────────────────────────
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fraud_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://fraud_user:fraud_pass@postgres:5432/fraud_db
+      API_KEY: dev-secret-key-change-in-production
+      GIT_PYTHON_REFRESH: quiet
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./logs:/app/logs
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  # ── Streamlit ───────────────────────────────────────────────────────────────
+  streamlit:
+    build:
+      context: .
+      dockerfile: Dockerfile.streamlit
+    container_name: fraud_streamlit
+    restart: unless-stopped
+    ports:
+      - "8501:8501"
+    environment:
+      API_BASE_URL: http://api:8000
+      API_KEY: dev-secret-key-change-in-production
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8501/_stcore/health')"]
+      interval: 30s
+      timeout: 10s
+      start_period: 30s
+      retries: 3
+
+volumes:
+  postgres_data:
