@@ -1,21 +1,42 @@
-data/ 
-models/ 
-.env 
-archive/ 
-archive.zip 
-conda 
-git 
-.ipynb_checkpoints/ 
-.pytest_cache/ 
+# Secrets
+.env
+*.env
 
-data/processed/ingested.pkl 
-data/processed/labeled.pkl 
-data/processed/train_engineered.csv 
-data/processed/train_engineered.pkl 
-data/processed/val_engineered.csv 
-data/processed/val_engineered.pkl 
-data/processed/test_engineered.csv 
-data/processed/test_engineered.pkl 
-data/processed/ingested.parquet 
-data/processed/labeled.parquet 
-data/processed/oof_predictions.parquet 
+# Data — large files
+data/raw/
+data/splits/
+data/processed/*.parquet
+data/processed/oof_predictions.parquet
+data/processed/chromadb/
+
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.egg-info/
+dist/
+build/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# MLflow
+logs/mlruns/
+mlartifacts/
+
+# Logs
+logs/*.log
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/

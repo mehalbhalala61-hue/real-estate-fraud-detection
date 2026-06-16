@@ -231,4 +231,4 @@ GIT_PYTHON_REFRESH=quiet
 
 ---
 
-*Built as portfolio project for ML Engineer (6-10 LPA) roles.*
+
