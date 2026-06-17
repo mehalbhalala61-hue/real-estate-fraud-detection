@@ -15,7 +15,7 @@ COPY configs/         configs/
 COPY src/             src/
 COPY streamlit_app/   streamlit_app/
 COPY data/processed/shap_artifacts.pkl  data/processed/shap_artifacts.pkl
-COPY reports/plots/   reports/plots/
+COPY reports/  reports/
 
 ENV PYTHONUNBUFFERED=1
 
