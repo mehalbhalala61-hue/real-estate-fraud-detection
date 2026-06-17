@@ -23,7 +23,10 @@ st.set_page_config(
     layout="wide",
 )
 
-API_URL = st.session_state.get("api_base_url", "http://localhost:8000")
+API_URL = (
+    st.session_state.get("api_base_url")
+    or os.getenv("API_BASE_URL", "http://localhost:8000")
+)
 API_KEY = st.session_state.get("api_key",      "dev-secret-key")
 HEADERS = {"X-API-Key": API_KEY}
 
