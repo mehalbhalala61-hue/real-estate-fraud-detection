@@ -40,3 +40,12 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
+
+data/processed/ingested.pkl
+data/processed/labeled.pkl
+data/processed/train_engineered.csv
+data/processed/train_engineered.pkl
+data/processed/val_engineered.csv
+data/processed/val_engineered.pkl
+data/processed/test_engineered.csv
+data/processed/test_engineered.pkl
