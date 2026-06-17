@@ -1,3 +1,12 @@
+---
+title: Real Estate Fraud Detection
+emoji: 🏠
+colorFrom: red
+colorTo: purple
+sdk: docker
+dockerfile: Dockerfile.streamlit
+pinned: false
+---
 # 🏠 Real Estate Fraud Detection
 
 **End-to-End ML Project** | Tabular + Text | LightGBM + Stacking | SHAP | MLflow | FastAPI | Docker | Streamlit
