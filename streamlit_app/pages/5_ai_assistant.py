@@ -214,7 +214,7 @@ with tab3:
         with st.expander(f"{icon} {name} — `{path_str}`"):
             st.caption(desc)
             if exists:
-                content = path.read_text(encoding="utf-8")
+                content = path.read_text(encoding="utf-8", errors="ignore")
                 st.text_area("Preview", content[:400] + "...", height=120, disabled=True)
             else:
                 st.warning("File nahi mili — corresponding notebook run karo")
