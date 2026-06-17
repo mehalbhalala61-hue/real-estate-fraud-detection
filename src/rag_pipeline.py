@@ -165,7 +165,7 @@ class RAGPipeline:
             raise ImportError("pip install sentence-transformers")
 
         # Small, fast model — good for retrieval
-        self._embedder = SentenceTransformer("all-MiniLM-L6-v2")
+        self._embedder = SentenceTransformer("paraphrase-MiniLM-L3-v2")
         logger.info("Embedder loaded: all-MiniLM-L6-v2")
 
     def _embed(self, texts: List[str]) -> List[List[float]]:
