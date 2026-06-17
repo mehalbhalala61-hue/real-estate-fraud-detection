@@ -18,7 +18,7 @@ os.chdir(project_root)
 st.set_page_config(page_title="History — Fraud Detector", page_icon="📋", layout="wide")
 
 API_URL = st.session_state.get("api_base_url", "http://localhost:8000")
-API_KEY = st.session_state.get("api_key", "dev-secret-key")
+API_KEY = st.session_state.get("api_key", os.getenv("API_KEY", "dev-secret-key"))
 HEADERS = {"X-API-Key": API_KEY}
 
 st.title("📋 Prediction History")
