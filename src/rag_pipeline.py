@@ -234,7 +234,7 @@ def _call_gemini(prompt: str, max_tokens: int = 400) -> str:
         raise ValueError("GOOGLE_API_KEY not set. Get free key: aistudio.google.com")
 
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    model = genai.GenerativeModel("gemini-1.5-flash-latest")
     response = model.generate_content(
         prompt,
         generation_config=genai.GenerationConfig(
