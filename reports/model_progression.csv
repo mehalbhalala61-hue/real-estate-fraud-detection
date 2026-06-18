@@ -1,6 +1,3 @@
-Model,PR-AUC,Recall@95P,Stage
-LR Baseline,0.5952,0.0,Day 5
-LGBM Baseline,0.7701,0.068,Day 5
-LGBM Tuned,0.7779,0.0744,Day 7
-Stacked,0.768,0.0234,Day 8
-★ Stacked+Calibrated,0.768,0.0234,Day 8 ← FINAL
+version https://git-lfs.github.com/spec/v1
+oid sha256:022191db2dc0da946aabb5f7ba2f57aea0cb4fd86593e6412c3abbd9be4894d1
+size 208

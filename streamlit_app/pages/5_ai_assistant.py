@@ -1,6 +1,6 @@
 """
 streamlit_app/pages/5_ai_assistant.py — AI Fraud Investigation Assistant
-RAG-powered chatbot using Gemini (free) + ChromaDB + sentence-transformers.
+Lightweight RAG (keyword retrieval, no embedding model) + Gemini free API.
 """
 
 import os
@@ -27,7 +27,10 @@ API_URL = (
     st.session_state.get("api_base_url")
     or os.getenv("API_BASE_URL", "http://localhost:8000")
 )
-API_KEY = st.session_state.get("api_key", os.getenv("API_KEY", "dev-secret-key"))
+API_KEY = (
+    st.session_state.get("api_key")
+    or os.getenv("API_KEY", "dev-secret-key")
+)
 HEADERS = {"X-API-Key": API_KEY}
 
 st.title("🤖 AI Fraud Investigation Assistant")
@@ -35,9 +38,8 @@ st.markdown(
     "**RAG-powered** — Gemini answers using actual project reports "
     "(EDA findings, SHAP analysis, threshold decisions)."
 )
-st.caption("Free: Google Gemini 1.5 Flash | sentence-transformers (local) | ChromaDB (local)")
+st.caption("Free: Google Gemini 1.5 Flash | Lightweight keyword retrieval (no heavy ML model)")
 
-# Check API key
 google_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
 if not google_key:
     st.warning(
@@ -49,7 +51,7 @@ if not google_key:
         "4. Streamlit restart karo"
     )
 
-@st.cache_resource(show_spinner="📚 Knowledge base index ho rahi hai...")
+@st.cache_resource(show_spinner="📚 Knowledge base load ho rahi hai...")
 def load_rag():
     from src.rag_pipeline import get_rag
     return get_rag()
@@ -86,8 +88,15 @@ with tab1:
                 resp   = httpx.post(f"{API_URL}/predict", json=listing_dict, headers=HEADERS, timeout=30.0)
                 result = resp.json()
             except httpx.ConnectError:
-                st.error("FastAPI not running — uvicorn start karo")
+                st.error("FastAPI not running — uvicorn start karo ya API_BASE_URL check karo")
                 st.stop()
+            except httpx.ReadTimeout:
+                st.error("API timeout — Render free tier cold start ho sakta hai, dobara try karo")
+                st.stop()
+
+        if "fraud_score" not in result:
+            st.error(f"API error: {result}")
+            st.stop()
 
         score = result["fraud_score"]
         tier  = result["risk_tier"]
@@ -104,7 +113,7 @@ with tab1:
         st.markdown("---")
         st.markdown("### 🧠 AI Explanation (RAG-powered)")
 
-        with st.spinner("📚 Knowledge base se context retrieve ho raha hai..."):
+        with st.spinner("🤖 Gemini analyzing..."):
             try:
                 rag         = load_rag()
                 explanation = rag.explain_prediction(
@@ -140,7 +149,6 @@ with tab2:
         pred = st.session_state["last_prediction"]
         st.info(f"📌 Context: Score=`{pred['fraud_score']:.4f}` | Tier=`{pred['risk_tier']}` | City=`{pred.get('city','N/A')}`")
 
-    # Quick questions
     st.markdown("**Quick questions:**")
     q1, q2, q3, q4 = st.columns(4)
     quick_qs = {
@@ -167,7 +175,7 @@ with tab2:
             st.markdown(prompt)
 
         with st.chat_message("assistant"):
-            with st.spinner("📚 Knowledge base search ho rahi hai..."):
+            with st.spinner("🤖 Gemini se reply aa raha hai..."):
                 try:
                     rag    = load_rag()
                     chunks = rag.retrieve(prompt, n_results=4)
@@ -197,7 +205,7 @@ with tab2:
 # ── TAB 3 ────────────────────────────────────────────────────────────────────
 with tab3:
     st.markdown("### 📚 Knowledge Base — Indexed Documents")
-    st.caption("Yeh documents ChromaDB mein indexed hain — RAG inhi se answers deta hai")
+    st.caption("Yeh documents memory mein load hain — RAG inhi se answers deta hai (lightweight keyword search)")
 
     docs_info = [
         ("reports/eda_findings.md",        "EDA Findings",        "Dataset stats, fraud rate, distributions"),
@@ -214,19 +222,19 @@ with tab3:
         with st.expander(f"{icon} {name} — `{path_str}`"):
             st.caption(desc)
             if exists:
-                content = path.read_text(encoding="utf-8", errors="ignore")
+                content = path.read_text(encoding="utf-8")
                 st.text_area("Preview", content[:400] + "...", height=120, disabled=True)
             else:
                 st.warning("File nahi mili — corresponding notebook run karo")
 
     st.markdown("---")
-    if st.button("🔄 Re-index Knowledge Base"):
-        with st.spinner("Re-indexing..."):
+    if st.button("🔄 Reload Knowledge Base"):
+        with st.spinner("Reloading..."):
             try:
                 from src.rag_pipeline import RAGPipeline
                 rag = RAGPipeline()
                 n   = rag.index(force_reindex=True)
                 st.cache_resource.clear()
-                st.success(f"✅ {n} chunks re-indexed")
+                st.success(f"✅ {n} documents reloaded")
             except Exception as e:
                 st.error(f"Error: {e}")
