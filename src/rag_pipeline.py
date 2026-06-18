@@ -153,7 +153,7 @@ Be concise (3-4 sentences max), reference specific numbers from context, no hall
 
 ANSWER:"""
 
-        return _call_gemini(prompt)
+        return _call_gemini(prompt, max_tokens=600)
 
     def explain_prediction(self, listing_dict: dict, prediction_result: dict) -> str:
         query   = f"threshold risk tier {prediction_result.get('risk_tier','')} price anomaly fraud signal"
@@ -179,37 +179,95 @@ CONTEXT: {context[:1000]}
 
 Write 2 short paragraphs (no jargon): (1) risk level + meaning, (2) specific action for investigator."""
 
-        return _call_gemini(prompt, max_tokens=300)
+        return _call_gemini(prompt, max_tokens=500)
+
+
+# Tried in order. If the first model is overloaded (503) or rate-limited (429),
+# we fall back to the next one before giving up.
+_MODEL_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",
+    "gemini-2.0-flash",
+    "gemini-2.5-flash-lite",
+]
+
+# Retries per model on a transient (503/429) error, with exponential backoff.
+_MAX_RETRIES_PER_MODEL = 2
+_BACKOFF_BASE_SECONDS = 1.5
 
 
 def _call_gemini(prompt: str, max_tokens: int = 400) -> str:
-    """Direct REST API call to Gemini — no library version issues."""
+    """Direct REST API call to Gemini — no library version issues.
+
+    Retries transient errors (503 "model overloaded", 429 "rate limited")
+    with exponential backoff, and falls back to alternate models if the
+    primary one keeps failing.
+    """
+    import time
     import httpx
 
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not set. Get free key: aistudio.google.com")
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1/models/"
-        f"gemini-2.5-flash:generateContent?key={api_key}"
-    )
-
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "maxOutputTokens": max_tokens,
             "temperature": 0.3,
+            # Gemini 2.5 models spend part of maxOutputTokens on internal
+            # "thinking" before producing the visible answer. For a simple
+            # Q&A/explanation task we don't need deep reasoning, so we cap
+            # the thinking budget low to leave room for the actual answer.
+            # (Ignored harmlessly by models that don't support thinking,
+            # e.g. gemini-2.0-flash.)
+            "thinkingConfig": {"thinkingBudget": 0},
         },
     }
 
-    resp = httpx.post(url, json=payload, timeout=25)
-    data = resp.json()
+    last_error = None
 
-    if resp.status_code != 200:
-        raise ValueError(f"{resp.status_code} {data}")
+    for model in _MODEL_FALLBACK_CHAIN:
+        url = (
+            "https://generativelanguage.googleapis.com/v1/models/"
+            f"{model}:generateContent?key={api_key}"
+        )
 
-    return data["candidates"][0]["content"]["parts"][0]["text"]
+        for attempt in range(_MAX_RETRIES_PER_MODEL + 1):
+            try:
+                resp = httpx.post(url, json=payload, timeout=25)
+                data = resp.json()
+
+                if resp.status_code == 200:
+                    if model != _MODEL_FALLBACK_CHAIN[0]:
+                        logger.info(f"Gemini fallback succeeded with model: {model}")
+                    return data["candidates"][0]["content"]["parts"][0]["text"]
+
+                # Transient errors: retry same model, then fall back.
+                if resp.status_code in (503, 429):
+                    last_error = f"{resp.status_code} {data}"
+                    logger.warning(
+                        f"Gemini {model} busy (attempt {attempt + 1}/"
+                        f"{_MAX_RETRIES_PER_MODEL + 1}): {last_error}"
+                    )
+                    if attempt < _MAX_RETRIES_PER_MODEL:
+                        time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                        continue
+                    break  # exhausted retries for this model — try next model
+
+                # Non-transient error (e.g. 400/404) — no point retrying same model.
+                raise ValueError(f"{resp.status_code} {data}")
+
+            except httpx.RequestError as e:
+                last_error = str(e)
+                logger.warning(f"Gemini {model} network error: {e}")
+                if attempt < _MAX_RETRIES_PER_MODEL:
+                    time.sleep(_BACKOFF_BASE_SECONDS * (2 ** attempt))
+                    continue
+                break
+
+    raise ValueError(
+        f"All Gemini models unavailable after retries. Last error: {last_error}"
+    )
 
 
 _rag: Optional[RAGPipeline] = None
