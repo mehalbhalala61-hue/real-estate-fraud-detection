@@ -1,17 +1,7 @@
 """
 src/rag_pipeline.py — Real Estate Fraud Detection
 LIGHTWEIGHT RAG — no sentence-transformers, no ChromaDB.
-
-Why lightweight? Knowledge base documents are small (few KB markdown files).
-Render free tier (512MB RAM) cannot handle sentence-transformers (~200MB)
-+ ChromaDB + the rest of the app simultaneously — causes timeout/crash.
-
-Approach: Load all small documents directly, score relevance via simple
-keyword overlap (pure Python, no ML model), inject into Gemini's context.
-
-Stack (all FREE, lightweight):
-  Retrieval : keyword overlap scoring (no embedding model, no vector DB)
-  LLM       : Google Gemini 1.5 Flash (free tier — 15 req/min, 1M tokens/day)
+Uses direct REST API call to Gemini — no library version issues.
 """
 
 import logging
@@ -22,11 +12,6 @@ from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Documents to index — project reports + configs
-# ─────────────────────────────────────────────────────────────────────────────
-
 KNOWLEDGE_BASE_DOCS = [
     "reports/eda_findings.md",
     "reports/business_insights.md",
@@ -36,10 +21,6 @@ KNOWLEDGE_BASE_DOCS = [
 
 
 def load_documents(doc_paths: Optional[List[str]] = None) -> List[dict]:
-    """
-    Load documents from disk. No chunking needed — files are small (<10KB each).
-    Returns list of {content, source} dicts.
-    """
     paths = doc_paths or KNOWLEDGE_BASE_DOCS
     docs  = []
 
@@ -49,7 +30,7 @@ def load_documents(doc_paths: Optional[List[str]] = None) -> List[dict]:
             logger.warning(f"Document not found — skipping: {path}")
             continue
         try:
-            content = path.read_text(encoding="utf-8")
+            content = path.read_text(encoding="utf-8", errors="ignore")
             docs.append({"content": content, "source": str(path)})
             logger.info(f"Loaded {path.name} ({len(content)} chars)")
         except Exception as e:
@@ -72,10 +53,6 @@ def load_documents(doc_paths: Optional[List[str]] = None) -> List[dict]:
     return docs
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Simple keyword-based relevance scoring — no ML model needed
-# ─────────────────────────────────────────────────────────────────────────────
-
 _STOPWORDS = {
     "the", "is", "at", "which", "on", "a", "an", "and", "or", "but",
     "in", "with", "to", "for", "of", "as", "by", "what", "why", "how",
@@ -85,7 +62,6 @@ _STOPWORDS = {
 
 
 def _score_relevance(query: str, doc_content: str) -> float:
-    """Keyword overlap score — fraction of query words found in doc. No ML model."""
     query_words = set(re.findall(r"\w+", query.lower())) - _STOPWORDS
     if not query_words:
         return 0.0
@@ -94,31 +70,21 @@ def _score_relevance(query: str, doc_content: str) -> float:
     return matches / len(query_words)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Lightweight RAG Pipeline
-# ─────────────────────────────────────────────────────────────────────────────
-
 class RAGPipeline:
-    """
-    Lightweight RAG — keyword retrieval + Gemini generation.
-    No embedding model, no vector DB — documents loaded once into memory.
-    """
 
     def __init__(self):
         self._docs    = []
         self._indexed = False
 
     def index(self, force_reindex: bool = False) -> int:
-        """Load documents into memory. Fast — no embedding computation."""
         if self._indexed and not force_reindex:
             return len(self._docs)
         self._docs    = load_documents()
         self._indexed = True
-        logger.info(f"✅ Lightweight index ready — {len(self._docs)} documents")
+        logger.info(f"Lightweight index ready — {len(self._docs)} documents")
         return len(self._docs)
 
     def retrieve(self, query: str, n_results: int = 4) -> List[dict]:
-        """Score documents by keyword overlap. Returns top N as {content, source, score}."""
         if not self._indexed:
             self.index()
         if not self._docs:
@@ -136,9 +102,9 @@ class RAGPipeline:
 
         top = scored[:n_results]
         if all(s["score"] == 0 for s in top):
-            top = scored   # fallback — docs are tiny, include everything
+            top = scored
 
-        logger.info(f"Retrieved {len(top)} docs for query: '{query[:40]}...'")
+        logger.info(f"Retrieved {len(top)} docs for query: '{query[:40]}'")
         return top
 
     def answer(
@@ -148,7 +114,6 @@ class RAGPipeline:
         prediction_context: Optional[dict] = None,
         chat_history: Optional[List[dict]] = None,
     ) -> str:
-        """Generate answer using Gemini + retrieved context."""
         if context_chunks is None:
             context_chunks = self.retrieve(query)
 
@@ -191,7 +156,6 @@ ANSWER:"""
         return _call_gemini(prompt)
 
     def explain_prediction(self, listing_dict: dict, prediction_result: dict) -> str:
-        """Generate natural language explanation for a fraud prediction."""
         query   = f"threshold risk tier {prediction_result.get('risk_tier','')} price anomaly fraud signal"
         chunks  = self.retrieve(query, n_results=2)
         context = "\n".join([c["content"][:1500] for c in chunks])
@@ -218,43 +182,40 @@ Write 2 short paragraphs (no jargon): (1) risk level + meaning, (2) specific act
         return _call_gemini(prompt, max_tokens=300)
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Gemini API call — free tier, with timeout protection
-# ─────────────────────────────────────────────────────────────────────────────
-
 def _call_gemini(prompt: str, max_tokens: int = 400) -> str:
-    """Call Gemini 1.5 Flash. Free: 15 req/min, 1M tokens/day."""
-    try:
-        import google.generativeai as genai
-    except ImportError:
-        raise ImportError("pip install google-generativeai")
+    """Direct REST API call to Gemini — no library version issues."""
+    import httpx
 
     api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GOOGLE_API_KEY not set. Get free key: aistudio.google.com")
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash-8b")
-    response = model.generate_content(
-        prompt,
-        generation_config=genai.GenerationConfig(
-            max_output_tokens=max_tokens,
-            temperature=0.3,
-        ),
-        request_options={"timeout": 25},
+    url = (
+        "https://generativelanguage.googleapis.com/v1/models/"
+        f"gemini-1.5-flash:generateContent?key={api_key}"
     )
-    return response.text
 
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.3,
+        },
+    }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Singleton
-# ─────────────────────────────────────────────────────────────────────────────
+    resp = httpx.post(url, json=payload, timeout=25)
+    data = resp.json()
+
+    if resp.status_code != 200:
+        raise ValueError(f"{resp.status_code} {data}")
+
+    return data["candidates"][0]["content"]["parts"][0]["text"]
+
 
 _rag: Optional[RAGPipeline] = None
 
 
 def get_rag() -> RAGPipeline:
-    """Return global RAG pipeline — loads docs on first call (fast, no ML model)."""
     global _rag
     if _rag is None:
         _rag = RAGPipeline()
